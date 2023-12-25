@@ -5,19 +5,24 @@ module FauxCombinator.Parser
     ( isEOF
     , peek
     , expect
+    , expect'
     , attempt
+    , eitherOf
+    , eitherOf'
     , zeroOrPlus
     , oneOrPlus
+    , ParserT
+    , Parser
     , runParserT
     , runParser
     , mkToken
+    , unToken
     , Token
     , ParserError(..)
     ) where
 
-import Control.Applicative ((<|>), Alternative(..))
-import Control.Monad (when, unless, MonadPlus(..), mzero)
-import Control.Monad.Error.Class (MonadError, throwError)
+import Control.Monad (when, unless)
+import Control.Monad.Error.Class (MonadError, throwError, catchError)
 import Control.Monad.Except (ExceptT(..), runExceptT)
 import Control.Monad.State.Lazy (StateT(..), MonadState, get, put, evalStateT)
 import Data.Functor.Identity (Identity, runIdentity)
@@ -27,8 +32,11 @@ data Token tt = Token
   { _tokenType :: tt
   , _tokenData :: String }
   deriving (Show, Eq)
+
 mkToken :: tt -> String -> Token tt
 mkToken = Token
+unToken :: Token tt -> String
+unToken = _tokenData
 
 data ParserError tt
   = ParserErrorUnexpected tt tt -- (Actual, Expected)
@@ -40,13 +48,8 @@ data ParserData tt = ParserData
   , _idx :: Int
   }
 
-newtype ParserT tt m r = ParserT { unParser :: StateT (ParserData tt) (ExceptT (ParserError tt) m) r }
-  deriving (Functor, Applicative, Monad)
+type ParserT tt m = StateT (ParserData tt) (ExceptT (ParserError tt) m)
 type Parser tt = ParserT tt Identity
-
-instance (MonadPlus m) => Alternative (ParserT tt m) where
-  empty = ParserT $ StateT $ \_ -> undefined
-  a <|> b = ParserT $ StateT $ \s -> ExceptT undefined
 
 isEOF :: (MonadState (ParserData tt) m) => m Bool
 isEOF = do
@@ -76,11 +79,17 @@ expect t = do
     throwError $ ParserErrorUnexpected (_tokenType token) t
   pure token
 
-eitherOf :: (Functor m) => ParserT tt m a -> ParserT tt m b -> ParserT tt m (Either a b)
-eitherOf a b = (Left <$> a) <|> (Right <$> b)
+expect' :: (MonadState (ParserData tt) m, MonadError (ParserError tt) m, Eq tt) => tt -> m ()
+expect' t = expect t *> pure ()
 
-attempt :: (Monad m) => ParserT tt m r -> ParserT tt m (Maybe r)
-attempt act = (Just <$> act) <|> (pure Nothing)
+eitherOf :: (Monad m) => ParserT tt m a -> ParserT tt m b -> ParserT tt m (Either a b)
+eitherOf a b = (Left <$> a) `catchError` const (Right <$> b)
+
+eitherOf' :: (Monad m) => ParserT tt m a -> ParserT tt m a -> ParserT tt m a
+eitherOf' a b = a `catchError` const b
+
+attempt :: (Monad m) => ParserT tt m a -> ParserT tt m (Maybe a)
+attempt act = (Just <$> act) `catchError` const (pure Nothing)
 
 zeroOrPlus :: (Monad m) => ParserT tt m r -> ParserT tt m [r]
 zeroOrPlus act = go []
@@ -89,7 +98,7 @@ zeroOrPlus act = go []
       got <- attempt act
       case got of
         Just x -> go (x:xs)
-        Nothing -> pure xs
+        Nothing -> pure $ reverse xs
 
 oneOrPlus :: (Monad m) => ParserT tt m r -> ParserT tt m (NonEmpty r)
 oneOrPlus act = do
@@ -98,7 +107,7 @@ oneOrPlus act = do
   pure $ x :| xs
 
 runParserT :: (Monad m) => ParserT tt m r -> [Token tt] -> m (Either (ParserError tt) r)
-runParserT act tokens = runExceptT $ evalStateT (unParser act) parser
+runParserT act tokens = runExceptT $ evalStateT act parser
   where parser = ParserData { _tokens = tokens, _idx = 0 }
 
 runParser :: Parser tt r -> [Token tt] -> Either (ParserError tt) r
