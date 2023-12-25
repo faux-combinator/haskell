@@ -1,5 +1,8 @@
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
+{-# LANGUAGE StandaloneDeriving #-}
+{-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE MultiParamTypeClasses #-}
 
 module FauxCombinator.Parser
     ( isEOF
@@ -48,7 +51,10 @@ data ParserData tt = ParserData
   , _idx :: Int
   }
 
-type ParserT tt m = StateT (ParserData tt) (ExceptT (ParserError tt) m)
+newtype ParserT tt m r = ParserT { unParser :: StateT (ParserData tt) (ExceptT (ParserError tt) m) r }
+  deriving (Functor, Applicative, Monad)
+deriving instance (MonadError (ParserError tt) m) => MonadError (ParserError tt) (ParserT tt m)
+
 type Parser tt = ParserT tt Identity
 
 isEOF :: (MonadState (ParserData tt) m) => m Bool
@@ -107,7 +113,7 @@ oneOrPlus act = do
   pure $ x :| xs
 
 runParserT :: (Monad m) => ParserT tt m r -> [Token tt] -> m (Either (ParserError tt) r)
-runParserT act tokens = runExceptT $ evalStateT act parser
+runParserT act tokens = runExceptT $ evalStateT (unParser act) parser
   where parser = ParserData { _tokens = tokens, _idx = 0 }
 
 runParser :: Parser tt r -> [Token tt] -> Either (ParserError tt) r
