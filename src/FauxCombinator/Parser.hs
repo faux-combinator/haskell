@@ -1,7 +1,8 @@
 {-# LANGUAGE FlexibleContexts #-}
 
 module FauxCombinator.Parser
-    ( peek
+    ( isEOF
+    , peek
     , expect
     , attempt
     , zeroOrPlus
@@ -9,23 +10,29 @@ module FauxCombinator.Parser
     , runParserT
     , runParser
     , mkToken
+    , Token
+    , ParserError(..)
     ) where
 
 import Control.Applicative ((<|>))
-import Control.Monad (unless)
+import Control.Monad (when, unless)
 import Control.Monad.Error.Class (MonadError, throwError)
 import Control.Monad.Except (ExceptT, runExceptT)
 import Control.Monad.State.Lazy (StateT(..), MonadState, get, put, evalStateT)
 import Data.Functor.Identity (Identity, runIdentity)
 import Data.List.NonEmpty (NonEmpty(..))
 
-data Token tt = Token { _tokenType :: tt, _tokenData :: String }
+data Token tt = Token
+  { _tokenType :: tt
+  , _tokenData :: String }
+  deriving (Show, Eq)
 mkToken :: tt -> String -> Token tt
 mkToken = Token
 
 data ParserError tt
   = ParserErrorUnexpected tt tt -- (Actual, Expected)
   | ParserErrorEOF
+  deriving (Show, Eq)
 
 data ParserData tt = ParserData
   { _tokens :: [Token tt]
@@ -35,19 +42,25 @@ data ParserData tt = ParserData
 type ParserT tt m = StateT (ParserData tt) (ExceptT (ParserError tt) m)
 type Parser tt = ParserT tt Identity
 
-next :: (MonadState (ParserData tt) m, MonadError (ParserError tt) m) => m (Token tt)
-next = do -- TODO lenses? (idx <<+= 1)
+isEOF :: (MonadState (ParserData tt) m) => m Bool
+isEOF = do
   state <- get
-  let idx = _idx state
-  if idx >= length (_tokens state)
-  then throwError ParserErrorEOF
-  else do
-    put state {_idx = idx + 1}
-    pure $ _tokens state !! idx
+  return $ _idx state >= length (_tokens state)
 
-peek :: (MonadState (ParserData tt) m) => m (Token tt)
+next :: (MonadState (ParserData tt) m, MonadError (ParserError tt) m) => m (Token tt)
+next = do
+  state <- get
+  eof <- isEOF
+  when eof $ throwError ParserErrorEOF
+  let idx = _idx state
+  put state {_idx = idx + 1} -- TODO lenses? (idx <<+= 1)
+  pure $ _tokens state !! idx
+
+peek :: (MonadState (ParserData tt) m, MonadError (ParserError tt) m) => m (Token tt)
 peek = do
   state <- get
+  eof <- isEOF
+  when eof $ throwError ParserErrorEOF
   pure $ _tokens state !! _idx state
 
 expect :: (MonadState (ParserData tt) m, MonadError (ParserError tt) m, Eq tt) => tt -> m (Token tt)
@@ -57,10 +70,9 @@ expect t = do
     throwError $ ParserErrorUnexpected (_tokenType token) t
   pure token
 
-attempt :: ParserT tt m r -> ParserT tt m (Maybe r)
-attempt act = undefined act -- (Just <$> act) <|> pure Nothing
+attempt :: Monad m => ParserT tt m r -> ParserT tt m (Maybe r)
+attempt act = liftA2 (<|>) (act >>= (pure . Just)) (pure Nothing)
 
--- ???either = (<|>)
 zeroOrPlus :: (Monad m) => ParserT tt m r -> ParserT tt m [r]
 zeroOrPlus act = go []
   where
