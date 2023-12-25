@@ -1,4 +1,5 @@
 {-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE GeneralizedNewtypeDeriving #-}
 
 module FauxCombinator.Parser
     ( isEOF
@@ -14,10 +15,10 @@ module FauxCombinator.Parser
     , ParserError(..)
     ) where
 
-import Control.Applicative ((<|>))
-import Control.Monad (when, unless)
+import Control.Applicative ((<|>), Alternative(..))
+import Control.Monad (when, unless, MonadPlus(..), mzero)
 import Control.Monad.Error.Class (MonadError, throwError)
-import Control.Monad.Except (ExceptT, runExceptT)
+import Control.Monad.Except (ExceptT(..), runExceptT)
 import Control.Monad.State.Lazy (StateT(..), MonadState, get, put, evalStateT)
 import Data.Functor.Identity (Identity, runIdentity)
 import Data.List.NonEmpty (NonEmpty(..))
@@ -39,8 +40,13 @@ data ParserData tt = ParserData
   , _idx :: Int
   }
 
-type ParserT tt m = StateT (ParserData tt) (ExceptT (ParserError tt) m)
+newtype ParserT tt m r = ParserT { unParser :: StateT (ParserData tt) (ExceptT (ParserError tt) m) r }
+  deriving (Functor, Applicative, Monad)
 type Parser tt = ParserT tt Identity
+
+instance (MonadPlus m) => Alternative (ParserT tt m) where
+  empty = ParserT $ StateT $ \_ -> undefined
+  a <|> b = ParserT $ StateT $ \s -> ExceptT undefined
 
 isEOF :: (MonadState (ParserData tt) m) => m Bool
 isEOF = do
@@ -70,8 +76,11 @@ expect t = do
     throwError $ ParserErrorUnexpected (_tokenType token) t
   pure token
 
-attempt :: Monad m => ParserT tt m r -> ParserT tt m (Maybe r)
-attempt act = liftA2 (<|>) (act >>= (pure . Just)) (pure Nothing)
+eitherOf :: (Functor m) => ParserT tt m a -> ParserT tt m b -> ParserT tt m (Either a b)
+eitherOf a b = (Left <$> a) <|> (Right <$> b)
+
+attempt :: (Monad m) => ParserT tt m r -> ParserT tt m (Maybe r)
+attempt act = (Just <$> act) <|> (pure Nothing)
 
 zeroOrPlus :: (Monad m) => ParserT tt m r -> ParserT tt m [r]
 zeroOrPlus act = go []
@@ -89,7 +98,7 @@ oneOrPlus act = do
   pure $ x :| xs
 
 runParserT :: (Monad m) => ParserT tt m r -> [Token tt] -> m (Either (ParserError tt) r)
-runParserT act tokens = runExceptT $ evalStateT act parser
+runParserT act tokens = runExceptT $ evalStateT (unParser act) parser
   where parser = ParserData { _tokens = tokens, _idx = 0 }
 
 runParser :: Parser tt r -> [Token tt] -> Either (ParserError tt) r
