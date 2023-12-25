@@ -3,8 +3,12 @@
 module FauxCombinator.Parser
     ( peek
     , expect
+    , attempt
+    , zeroOrPlus
+    , oneOrPlus
     , runParserT
     , runParser
+    , mkToken
     ) where
 
 import Control.Applicative ((<|>))
@@ -13,12 +17,14 @@ import Control.Monad.Error.Class (MonadError, throwError)
 import Control.Monad.Except (ExceptT, runExceptT)
 import Control.Monad.State.Lazy (StateT(..), MonadState, get, put, evalStateT)
 import Data.Functor.Identity (Identity, runIdentity)
+import Data.List.NonEmpty (NonEmpty(..))
 
 data Token tt = Token { _tokenType :: tt, _tokenData :: String }
+mkToken :: tt -> String -> Token tt
+mkToken = Token
 
 data ParserError tt
   = ParserErrorUnexpected tt tt -- (Actual, Expected)
-  | ParserErrorEitherNoMatch
   | ParserErrorEOF
 
 data ParserData tt = ParserData
@@ -51,10 +57,24 @@ expect t = do
     throwError $ ParserErrorUnexpected (_tokenType token) t
   pure token
 
-attempt :: (Monad m) => StateT tt m r -> StateT tt m (Maybe r)
-attempt act = (act >>= pure . Just) <|> pure Nothing
+attempt :: ParserT tt m r -> ParserT tt m (Maybe r)
+attempt act = undefined act -- (Just <$> act) <|> pure Nothing
 
---many :: (MonadState (ParserData tt) m) -> 
+-- ???either = (<|>)
+zeroOrPlus :: (Monad m) => ParserT tt m r -> ParserT tt m [r]
+zeroOrPlus act = go []
+  where
+    go xs = do
+      got <- attempt act
+      case got of
+        Just x -> go (x:xs)
+        Nothing -> pure xs
+
+oneOrPlus :: (Monad m) => ParserT tt m r -> ParserT tt m (NonEmpty r)
+oneOrPlus act = do
+  x <- act
+  xs <- zeroOrPlus act
+  pure $ x :| xs
 
 runParserT :: (Monad m) => ParserT tt m r -> [Token tt] -> m (Either (ParserError tt) r)
 runParserT act tokens = runExceptT $ evalStateT act parser
