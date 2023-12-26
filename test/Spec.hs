@@ -1,3 +1,4 @@
+import Control.Applicative
 import Data.List.NonEmpty
 import Test.Hspec
 import FauxCombinator.Parser
@@ -54,13 +55,13 @@ main = hspec $ do
     it "returns rhs (backtracks)" $ do
       runParser (eitherOf (expect TokenLparen) (expect TokenRparen)) [rparen] `shouldBe` Right (Right rparen)
 
-  describe "eitherOf'" $ do
+  describe "Applicative.<|>" $ do
     it "errors on EOF" $ do
-      runParser (eitherOf' (expect TokenLparen) (expect TokenRparen)) notokens `shouldBe` Left ParserErrorEOF
+      runParser (expect TokenLparen <|> expect TokenRparen) notokens `shouldBe` Left ParserErrorEOF
     it "returns lhs" $ do
-      runParser (eitherOf' (expect TokenLparen) (expect TokenRparen)) [lparen] `shouldBe` Right lparen
+      runParser (expect TokenLparen <|> expect TokenRparen) [lparen] `shouldBe` Right lparen
     it "returns rhs (backtracks)" $ do
-      runParser (eitherOf' (expect TokenLparen) (expect TokenRparen)) [rparen] `shouldBe` Right rparen
+      runParser (expect TokenLparen <|> expect TokenRparen) [rparen] `shouldBe` Right rparen
 
   describe "attempt" $ do
     it "returns empty on EOF" $ do
@@ -70,21 +71,29 @@ main = hspec $ do
     it "backtracks" $ do
       runParser (attempt (expect TokenLparen) >> expect TokenRparen) [rparen] `shouldBe` Right rparen
 
-  describe "zeroOrPlus" $ do
+  describe "Applicative.many" $ do
     it "returns empty on EOF" $ do
-      runParser (zeroOrPlus $ expect TokenId) notokens `shouldBe` Right []
+      runParser (many $ expect TokenId) notokens `shouldBe` Right []
     it "parses one" $ do
-      runParser (zeroOrPlus $ expect TokenId) [idA] `shouldBe` Right [idA]
+      runParser (many $ expect TokenId) [idA] `shouldBe` Right [idA]
     it "parses several" $ do
-      runParser (zeroOrPlus $ expect TokenId) [idA, idB, idC] `shouldBe` Right [idA, idB, idC]
+      runParser (many $ expect TokenId) [idA, idB, idC] `shouldBe` Right [idA, idB, idC]
 
-  describe "oneOrPlus" $ do
+  describe "Applicative.some" $ do
     it "errors on EOF" $ do
-      runParser (oneOrPlus $ expect TokenId) notokens `shouldBe` Left ParserErrorEOF
+      runParser (some $ expect TokenId) notokens `shouldBe` Left ParserErrorEOF
     it "parses one" $ do
-      runParser (oneOrPlus $ expect TokenId) [idA] `shouldBe` Right (idA :| [])
+      runParser (some $ expect TokenId) [idA] `shouldBe` Right [idA]
     it "parses several" $ do
-      runParser (oneOrPlus $ expect TokenId) [idA, idB, idC] `shouldBe` Right (idA :| [idB, idC])
+      runParser (some $ expect TokenId) [idA, idB, idC] `shouldBe` Right [idA, idB, idC]
+
+  describe "someNEL" $ do
+    it "errors on EOF" $ do
+      runParser (someNEL $ expect TokenId) notokens `shouldBe` Left ParserErrorEOF
+    it "parses one" $ do
+      runParser (someNEL $ expect TokenId) [idA] `shouldBe` Right (idA :| [])
+    it "parses several" $ do
+      runParser (someNEL $ expect TokenId) [idA, idB, idC] `shouldBe` Right (idA :| [idB, idC])
 
   describe "composition and backtracking" $ do
     it "can mix and match" $ do
@@ -100,11 +109,11 @@ main = hspec $ do
 call :: Parser TokenType Expr
 call = expr
   where
-    expr = eitherOf' idExpr callExpr
+    expr = idExpr <|> callExpr
     idExpr = Id . unToken <$> expect TokenId
     callExpr = do
       expect' TokenLparen
       callee <- expr
-      args <- zeroOrPlus expr
+      args <- many expr
       expect' TokenRparen
       pure $ Call callee args
