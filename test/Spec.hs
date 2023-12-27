@@ -1,3 +1,5 @@
+{-# LANGUAGE DerivingStrategies #-}
+
 import Control.Applicative
 import Control.Monad
 import Control.Monad.IO.Class
@@ -9,10 +11,10 @@ data TokenType
   = TokenLparen
   | TokenRparen
   | TokenId
-  deriving (Show, Eq)
+  deriving stock (Show, Eq)
 
 data Expr = Id String | Call Expr [Expr]
-  deriving (Eq, Show)
+  deriving stock (Eq, Show)
 
 main :: IO ()
 main = hspec $ do

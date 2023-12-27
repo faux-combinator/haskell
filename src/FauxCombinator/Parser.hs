@@ -1,3 +1,4 @@
+{-# LANGUAGE DerivingStrategies         #-}
 {-# LANGUAGE FlexibleContexts           #-}
 {-# LANGUAGE FlexibleInstances          #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
@@ -32,7 +33,7 @@ import Data.List.NonEmpty (NonEmpty (..))
 data Token tt = Token
   { _tokenType :: tt
   , _tokenData :: String }
-  deriving (Show, Eq)
+  deriving stock (Show, Eq)
 
 mkToken :: tt -> String -> Token tt
 mkToken = Token
@@ -43,7 +44,7 @@ data ParserError tt
   = ParserErrorUnexpected tt tt -- (Actual, Expected)
   | ParserErrorEOF
   | ParserErrorNoParse
-  deriving (Show, Eq)
+  deriving stock (Show, Eq)
 
 data ParserData tt = ParserData
   { _tokens :: [Token tt]
@@ -51,7 +52,7 @@ data ParserData tt = ParserData
   }
 
 newtype ParserT tt m r = ParserT { unParser :: StateT (ParserData tt) (ExceptT (ParserError tt) m) r }
-  deriving (Functor, Applicative, Monad, MonadState (ParserData tt), MonadError (ParserError tt), MonadIO)
+  deriving newtype (Functor, Applicative, Monad, MonadState (ParserData tt), MonadError (ParserError tt), MonadIO)
 
 type Parser tt = ParserT tt Identity
 
