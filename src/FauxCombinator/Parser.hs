@@ -56,6 +56,7 @@ newtype ParserT tt m r = ParserT { unParser :: StateT (ParserData tt) (ExceptT (
 
 type Parser tt = ParserT tt Identity
 
+-- This means that parser-combinators' Control.Applicative.Combinators all work nicely here
 instance (Monad m) => Alternative (ParserT tt m) where
   empty = throwError ParserErrorNoParse
   a <|> b = a `catchError` const b
@@ -91,6 +92,7 @@ expect t = do
 expect' :: (MonadState (ParserData tt) m, MonadError (ParserError tt) m, Eq tt) => tt -> m ()
 expect' t = expect t $> ()
 
+-- eitherA in Protolude
 eitherOf :: (Alternative m) => m a -> m b -> m (Either a b)
 eitherOf a b = (Left <$> a) <|> (Right <$> b)
 
