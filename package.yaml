@@ -35,6 +35,8 @@ ghc-options:
 - -Wpartial-fields
 - -Wredundant-constraints
 - -Wmissing-deriving-strategies
+- -fwrite-ide-info
+- -hiedir=.hie
 
 library:
   source-dirs: src
