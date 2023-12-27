@@ -1,6 +1,6 @@
 name:                FauxCombinator
 version:             0.1.0.0
-github:              "vendethiel/FauxCombinator"
+github:              "faux-combinator/haskell"
 license:             BSD-3-Clause
 author:              "Ven de Thiel"
 maintainer:          "karp@hotmail.fr"
@@ -17,7 +17,7 @@ extra-source-files:
 # To avoid duplicated efforts in documentation and dealing with the
 # complications of embedding Haddock markup inside cabal files, it is
 # common to point users to the README.md file.
-description:         Please see the README on GitHub at <https://github.com/vendethiel/FauxCombinator#readme>
+description:         Please see the README on GitHub at <https://github.com/faux-combinator/haskell/>
 
 dependencies:
 - base >= 4.7 && < 5
@@ -37,17 +37,6 @@ ghc-options:
 
 library:
   source-dirs: src
-
-#executables:
-#  FauxCombinator-exe:
-#    main:                Main.hs
-#    source-dirs:         app
-#    ghc-options:
-#    - -threaded
-#    - -rtsopts
-#    - -with-rtsopts=-N
-#    dependencies:
-#    - FauxCombinator
 
 tests:
   FauxCombinator-test:
