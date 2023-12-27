@@ -8,7 +8,6 @@ module FauxCombinator.Parser
     , peek
     , expect
     , expect'
-    , attempt
     , eitherOf
     , someNEL
     , ParserT
@@ -27,6 +26,7 @@ import Control.Monad.Error.Class (MonadError, catchError, throwError)
 import Control.Monad.Except (ExceptT (..), runExceptT)
 import Control.Monad.IO.Class (MonadIO)
 import Control.Monad.State.Lazy (MonadState, StateT (..), evalStateT, get, put)
+import Data.Functor (($>))
 import Data.Functor.Identity (Identity, runIdentity)
 import Data.List.NonEmpty (NonEmpty (..))
 
@@ -89,13 +89,10 @@ expect t = do
   pure token
 
 expect' :: (MonadState (ParserData tt) m, MonadError (ParserError tt) m, Eq tt) => tt -> m ()
-expect' t = expect t *> pure ()
+expect' t = expect t $> ()
 
 eitherOf :: (Alternative m) => m a -> m b -> m (Either a b)
 eitherOf a b = (Left <$> a) <|> (Right <$> b)
-
-attempt :: (Alternative m) => m a -> m (Maybe a)
-attempt act = (Just <$> act) <|> (pure Nothing)
 
 someNEL :: (Alternative m) => m r -> m (NonEmpty r)
 someNEL act = (:|) <$> act <*> many act

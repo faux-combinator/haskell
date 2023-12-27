@@ -67,13 +67,13 @@ main = hspec $ do
     it "returns rhs (backtracks)" $ do
       runParser (expect TokenLparen <|> expect TokenRparen) [rparen] `shouldBe` Right rparen
 
-  describe "attempt" $ do
+  describe "Applicative.optional" $ do
     it "returns empty on EOF" $ do
-      runParser (attempt $ expect TokenId) notokens `shouldBe` Right Nothing
+      runParser (optional $ expect TokenId) notokens `shouldBe` Right Nothing
     it "returns empty on wrong token type" $ do
-      runParser (attempt $ expect TokenLparen) [rparen] `shouldBe` Right Nothing
+      runParser (optional $ expect TokenLparen) [rparen] `shouldBe` Right Nothing
     it "backtracks" $ do
-      runParser (attempt (expect TokenLparen) >> expect TokenRparen) [rparen] `shouldBe` Right rparen
+      runParser (optional (expect TokenLparen) >> expect TokenRparen) [rparen] `shouldBe` Right rparen
 
   describe "Applicative.many" $ do
     it "returns empty on EOF" $ do
@@ -90,6 +90,18 @@ main = hspec $ do
       runParser (some $ expect TokenId) [idA] `shouldBe` Right [idA]
     it "parses several" $ do
       runParser (some $ expect TokenId) [idA, idB, idC] `shouldBe` Right [idA, idB, idC]
+
+  describe "Applicative.asum" $ do
+    it "errors on EOF" $ do
+      runParser (asum [expect TokenLparen, expect TokenRparen]) notokens `shouldBe` Left ParserErrorNoParse
+    it "errors on no actions" $ do
+      runParser (asum ([] :: [Parser TokenType Bool])) notokens `shouldBe` Left ParserErrorNoParse
+    it "returns lhs" $ do
+      runParser (asum [expect TokenLparen, expect TokenId, expect TokenRparen]) [lparen] `shouldBe` Right lparen
+    it "returns mid (backtracks)" $ do
+      runParser (asum [expect TokenLparen, expect TokenId, expect TokenRparen]) [idA] `shouldBe` Right idA
+    it "returns rhs (backtracks)" $ do
+      runParser (asum [expect TokenLparen, expect TokenId, expect TokenRparen]) [rparen] `shouldBe` Right rparen
 
   describe "someNEL" $ do
     it "errors on EOF" $ do
