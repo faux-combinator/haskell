@@ -1,6 +1,6 @@
-{-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE FlexibleContexts           #-}
+{-# LANGUAGE FlexibleInstances          #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
-{-# LANGUAGE FlexibleInstances #-}
 
 module FauxCombinator.Parser
     ( isEOF
@@ -20,14 +20,14 @@ module FauxCombinator.Parser
     , ParserError(..)
     ) where
 
-import Control.Applicative (Alternative(..), (<|>))
-import Control.Monad (when, unless)
-import Control.Monad.Error.Class (MonadError, throwError, catchError)
-import Control.Monad.Except (ExceptT(..), runExceptT)
+import Control.Applicative (Alternative (..), (<|>))
+import Control.Monad (unless, when)
+import Control.Monad.Error.Class (MonadError, catchError, throwError)
+import Control.Monad.Except (ExceptT (..), runExceptT)
 import Control.Monad.IO.Class (MonadIO)
-import Control.Monad.State.Lazy (StateT(..), MonadState, get, put, evalStateT)
+import Control.Monad.State.Lazy (MonadState, StateT (..), evalStateT, get, put)
 import Data.Functor.Identity (Identity, runIdentity)
-import Data.List.NonEmpty (NonEmpty(..))
+import Data.List.NonEmpty (NonEmpty (..))
 
 data Token tt = Token
   { _tokenType :: tt
@@ -47,7 +47,7 @@ data ParserError tt
 
 data ParserData tt = ParserData
   { _tokens :: [Token tt]
-  , _idx :: Int
+  , _idx    :: Int
   }
 
 newtype ParserT tt m r = ParserT { unParser :: StateT (ParserData tt) (ExceptT (ParserError tt) m) r }
