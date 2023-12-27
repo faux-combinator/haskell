@@ -24,6 +24,7 @@ import Control.Applicative (Alternative(..), (<|>))
 import Control.Monad (when, unless)
 import Control.Monad.Error.Class (MonadError, throwError, catchError)
 import Control.Monad.Except (ExceptT(..), runExceptT)
+import Control.Monad.IO.Class (MonadIO)
 import Control.Monad.State.Lazy (StateT(..), MonadState, get, put, evalStateT)
 import Data.Functor.Identity (Identity, runIdentity)
 import Data.List.NonEmpty (NonEmpty(..))
@@ -50,7 +51,7 @@ data ParserData tt = ParserData
   }
 
 newtype ParserT tt m r = ParserT { unParser :: StateT (ParserData tt) (ExceptT (ParserError tt) m) r }
-  deriving (Functor, Applicative, Monad, MonadState (ParserData tt), MonadError (ParserError tt))
+  deriving (Functor, Applicative, Monad, MonadState (ParserData tt), MonadError (ParserError tt), MonadIO)
 
 type Parser tt = ParserT tt Identity
 

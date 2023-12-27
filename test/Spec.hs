@@ -1,4 +1,6 @@
 import Control.Applicative
+import Control.Monad
+import Control.Monad.IO.Class
 import Data.List.NonEmpty
 import Test.Hspec
 import FauxCombinator.Parser
@@ -104,7 +106,15 @@ main = hspec $ do
       runParser call [lparen, idA, idB, idC, rparen] `shouldBe` Right (Call (Id "a") [Id "b", Id "c"])
 
   describe "monad transformer" $ do
-    pure ()
+    it "can be used with a user monad" $ do
+      runParserT (expect TokenId) [idA] `shouldBe` Just (Right idA)
+      let ioact = do
+            expect' TokenId
+            str <- liftIO $ readFile "test/io.txt"
+            eof <- isEOF
+            guard eof
+            pure str
+      runParserT ioact [idA] `shouldReturn` Right "io content\n"
 
 call :: Parser TokenType Expr
 call = expr
